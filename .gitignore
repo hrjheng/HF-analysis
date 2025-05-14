@@ -1,0 +1,8 @@
+# Ignore folders
+MVAID-Trainer/python_packages
+MVAID-Trainer/Output*
+**/.ipynb_checkpoints/
+**/__pycache__/
+
+# Ignore files
+MVAID-Trainer/Trainer_backup.ipynb
