@@ -24,7 +24,6 @@ Branches = [
     "K_S0_decayLengthErr",
     "track_1_IP_xy",
     "track_2_IP_xy",
-    "nEventTracks",
     "K_S0_SV_chi2_per_nDoF",
     "K_S0_chi2",
     "track_1_pT",
@@ -34,6 +33,7 @@ Branches = [
     "track_1_phi",
     "track_2_phi",
 ]
+
 # Signal and backgroun weights in the ntuples
 # if the string is empty, the weight is set to 1
 SignalWeights = [""]
@@ -66,7 +66,6 @@ features = {
         "K_S0_decayLengthErr",
         "track_1_IP_xy",
         "track_2_IP_xy",
-        "nEventTracks",
         "K_S0_SV_chi2_per_nDoF",
         "K_S0_chi2",
         "track_1_pseudorapidity",
@@ -75,6 +74,24 @@ features = {
         "track_2_phi",
     ]
 }  # Input features to MVA #Should be in your ntuples
+
+# map of tuple for each feature for plotting
+# The first element is whether to use log scale in the x-axis
+# The second element is whether to use log scale in the y-axis
+# The third element is the binning
+FeatureBins = {
+    "K_S0_DIRA": (False, True, [i for i in np.linspace(0.95, 1, 100)]),
+    "K_S0_decayLength": (False, True, [i for i in np.linspace(0, 10, 100)]),
+    "K_S0_decayLengthErr": (False, True, [i for i in np.linspace(0, 20, 100)]),
+    "track_1_IP_xy": (False, True, [i for i in np.linspace(-10, 10, 100)]),
+    "track_2_IP_xy": (False, True, [i for i in np.linspace(-10, 10, 100)]),
+    "K_S0_SV_chi2_per_nDoF": (True, True, [i for i in np.logspace(np.log10(1E-5), np.log10(50), 60)]),
+    "K_S0_chi2": (True, True, [i for i in np.logspace(np.log10(1E-5), np.log10(50), 60)]),
+    "track_1_pseudorapidity": (False, False, [i for i in np.linspace(-2, 2, 80)]),
+    "track_2_pseudorapidity": (False, False, [i for i in np.linspace(-2, 2, 80)]),
+    "track_1_phi": (False, False, [i for i in np.linspace(-3.2, 3.2, 128)]),
+    "track_2_phi": (False, False, [i for i in np.linspace(-3.2, 3.2, 128)])
+}
 
 featureplotparam_json = "FeaturePlotParam_MergedIDEB1Gsf.json"
 

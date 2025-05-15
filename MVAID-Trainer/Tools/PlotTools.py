@@ -1,7 +1,20 @@
 # Plotting Tools
-
+import os
 import matplotlib.pyplot as plt
 import numpy as np
+from ROOT import (
+    TCanvas,
+    TLegend,
+    TH1F,
+    TColor,
+    gROOT,
+    gStyle,
+    gPad,
+    gSystem,
+    kTRUE,
+    kFALSE,
+)
+import array
 
 
 def prGreen(prt):
@@ -48,6 +61,7 @@ def plot_mva(
             linewidth=2,
             color=Color,
         )
+
     # ax.set_ylabel("density")
     ax.set_xlabel(column)
     ax.set_title(title)
@@ -134,6 +148,93 @@ def pngtopdf(ListPattern=[], Save="mydoc.pdf"):
         rgb.paste(Li, mask=Li.split()[3])
         L[i] = rgb
     L[0].save(Save, "PDF", resolution=100.0, save_all=True, append_images=L[1:])
+
+
+def MakeFeaturePlotsROOT(
+    df_final,
+    features,
+    feature_bins,
+    Set="Train",
+    MVA="XGB_1",
+    OutputDirName="Output",
+    cat="Category",
+    label=[""],
+    weight="weight",
+):
+    prGreen(f"Making {Set} dataset feature plots with ROOT")
+
+    os.makedirs(OutputDirName + "/" + MVA + "/Features", exist_ok=True)
+
+    color_map = ["#1a508b", "#c70039", "#ee8866", "#228833", "#99ddff", "#aa4499"]
+
+    for m, feature in enumerate(features):
+        canvas = TCanvas(f"canvas_{feature}", f"canvas_{feature}", 800, 700)
+        if feature_bins[feature][0] is True:
+            canvas.SetLogx()
+        if feature_bins[feature][1] is True:
+            canvas.SetLogy()
+
+        hist_list = []
+
+        for i, (group_name, group_df) in enumerate(
+            df_final[df_final["Dataset"] == Set].groupby(cat)
+        ):
+            hname = f"{feature}_{label[i]}"
+            hist = TH1F(
+                hname,
+                hname,
+                len(feature_bins[feature][2]) - 1,
+                array.array("d", feature_bins[feature][2]),
+            )
+
+            for val, w in zip(group_df[feature], group_df[weight]):
+                hist.Fill(val, w)
+
+            hist.Scale(1.0 / hist.Integral(-1, -1))
+
+            hist_list.append(hist)
+
+        # get the maximum y value of all histograms
+        min_y = min([hist.GetMinimum(0) for hist in hist_list])
+        max_y = max([hist.GetMaximum() for hist in hist_list])
+
+        for i, hist in enumerate(hist_list):
+            # Style
+            hist.SetLineColor(TColor.GetColor(color_map[i]))
+            hist.SetLineWidth(2)
+            hist.GetXaxis().SetTitle(feature)
+            # if feature_bins[feature][0] is True:
+            #     hist.GetXaxis().SetMoreLogLabels()
+            hist.GetYaxis().SetTitle("Normalized Entries")
+            hist.GetYaxis().SetRangeUser(
+                0 if feature_bins[feature][1] is False else min_y * 0.7,
+                max_y * 1.2 if feature_bins[feature][1] is False else max_y * 10,
+            )
+            # if feature_bins[feature][1] is True:
+            #     hist.GetXaxis().SetMoreLogLabels()
+
+            draw_opt = "HIST" if i == 0 else "HIST SAME"
+            hist.Draw(draw_opt)
+
+        legend = TLegend(
+            (1 - gPad.GetRightMargin()) - 0.7,
+            (1 - gPad.GetTopMargin()) - 0.1,
+            (1 - gPad.GetRightMargin()) - 0.07,
+            (1 - gPad.GetTopMargin()) - 0.05,
+        )
+        legend.SetNColumns(2)
+        legend.SetTextSize(0.04)
+        legend.SetBorderSize(0)
+        legend.SetFillStyle(0)
+        for i, hist in enumerate(hist_list):
+            legend.AddEntry(hist, label[i], "l")
+        legend.Draw()
+
+        canvas.SaveAs(f"{OutputDirName}/{MVA}/Features/feature_{feature}_{Set}.pdf")
+        canvas.SaveAs(f"{OutputDirName}/{MVA}/Features/feature_{feature}_{Set}.png")
+
+        canvas.Close()
+        del canvas
 
 
 def MakeFeaturePlots(
