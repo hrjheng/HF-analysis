@@ -50,17 +50,17 @@ TestSize = 0.2
 CommonCut = ""
 
 # Models
-MVAs = ["XGB_1"]
+MVAs = ["XGB"]
 
 MVAColors = ["#1a508b", "#c70039"]  # Plot colors for MVAs
 
 MVALabels = {
-    "XGB_1": "XGB",
+    "XGB": "XGB",
 }
 
 # Training features
 features = {
-    "XGB_1": [
+    "XGB": [
         "K_S0_DIRA",
         "K_S0_decayLength",
         "K_S0_decayLengthErr",
@@ -85,27 +85,30 @@ FeatureBins = {
     "K_S0_decayLengthErr": (False, True, [i for i in np.linspace(0, 20, 100)]),
     "track_1_IP_xy": (False, True, [i for i in np.linspace(-10, 10, 100)]),
     "track_2_IP_xy": (False, True, [i for i in np.linspace(-10, 10, 100)]),
-    "K_S0_SV_chi2_per_nDoF": (True, True, [i for i in np.logspace(np.log10(1E-5), np.log10(50), 60)]),
-    "K_S0_chi2": (True, True, [i for i in np.logspace(np.log10(1E-5), np.log10(50), 60)]),
+    "K_S0_SV_chi2_per_nDoF": (
+        True,
+        True,
+        [i for i in np.logspace(np.log10(1e-5), np.log10(50), 60)],
+    ),
+    "K_S0_chi2": (
+        True,
+        True,
+        [i for i in np.logspace(np.log10(1e-5), np.log10(50), 60)],
+    ),
     "track_1_pseudorapidity": (False, False, [i for i in np.linspace(-2, 2, 80)]),
     "track_2_pseudorapidity": (False, False, [i for i in np.linspace(-2, 2, 80)]),
     "track_1_phi": (False, False, [i for i in np.linspace(-3.2, 3.2, 128)]),
-    "track_2_phi": (False, False, [i for i in np.linspace(-3.2, 3.2, 128)])
+    "track_2_phi": (False, False, [i for i in np.linspace(-3.2, 3.2, 128)]),
 }
 
-featureplotparam_json = "FeaturePlotParam_MergedIDEB1Gsf.json"
-
-# when not sure about the binning, you can just specify numbers, which will then correspond to total bins
-# You can even specify lists like [10,20,30,100]
-
 # Grid Search parameters for XGB (will only be used if MVAs contains "XGB"
-XGBGridSearch = { 
-    "XGB_1": {
+XGBGridSearch = {
+    "XGB": {
         "learning_rate": [0.1],
         "max_depth": [6],
         "min_child_weight": [500],
         "gamma": [1],
-        "scale_pos_weight": [1]
+        "scale_pos_weight": [1],
     }
 }
 
