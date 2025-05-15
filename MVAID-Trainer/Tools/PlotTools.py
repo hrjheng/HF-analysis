@@ -15,6 +15,8 @@ from ROOT import (
     kFALSE,
 )
 import array
+import pandas as pd
+import seaborn as sns
 
 
 def prGreen(prt):
@@ -235,6 +237,53 @@ def MakeFeaturePlotsROOT(
 
         canvas.Close()
         del canvas
+
+
+# make correlation matrix
+def MakeCorrelationMatrix(X, features, MVA, method="pearson", OutputDirName="Output"):
+    X_df = pd.DataFrame(X, columns=features)
+    corrmatrix = X_df.corr(method=method)
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+    sns.heatmap(
+        corrmatrix,
+        annot=True,
+        fmt=".2f",
+        cmap="coolwarm",
+        square=True,
+        cbar_kws={"shrink": 0.8},
+        ax=ax
+    )
+    ax.set_xticklabels(
+        ax.get_xticklabels(), rotation=45, horizontalalignment="right"
+    )
+    ax.set_yticklabels(
+        ax.get_yticklabels(), rotation=0, horizontalalignment="right"
+    )
+    plt.savefig(
+        f"{OutputDirName}/{MVA}/Features/{MVA}_feature_correlation_matrix.pdf",
+        bbox_inches="tight"
+    )
+    plt.close(fig)
+
+
+def plot_feature_importance(model, feature_names, outpath, title="Feature Importance"):
+    importances = model.feature_importances_
+    indices = np.argsort(importances)[::-1]  # descending order
+
+    sorted_features = [feature_names[i] for i in indices]
+    sorted_importances = importances[indices]
+
+    plt.figure(figsize=(7, 0.4 * len(feature_names) + 1))
+    bars = plt.barh(range(len(sorted_features)), sorted_importances[::-1], align="center", color='steelblue')
+    plt.yticks(range(len(sorted_features)), sorted_features[::-1])
+    plt.xlabel("Importance")
+    plt.title(title)
+
+    # Save
+    plt.savefig(outpath + ".pdf")
+    plt.savefig(outpath + ".png")
+    plt.close()
 
 
 def MakeFeaturePlots(
