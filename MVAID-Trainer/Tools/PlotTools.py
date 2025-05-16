@@ -107,6 +107,39 @@ def plot_roc_curve(
         alpha=0.7,
     )
     ax.legend(loc="best")
+
+    # Find the best working point, i.e the point closest to (1,1) of tpr v.s (1-fpr)
+    mindist = 1e10
+    best_tpr = 0
+    best_bkgrej = 0
+    bkgrej = list(map(lambda x: 1 - x, fpr))
+    for i in range(len(bkgrej)):
+        dist = np.sqrt((1 - tpr[i]) ** 2 + (1 - bkgrej[i]) ** 2)
+        if dist < mindist:
+            mindist = dist
+            best_tpr = tpr[i]
+            best_bkgrej = bkgrej[i]
+
+    # get the corresponding prediction threshold
+    best_threshold = thresholds[np.argmin(np.abs(tpr - best_tpr))]
+    print("Best threshold: {:.3f}".format(best_threshold))
+    print("Best TPR: {:.3f}".format(best_tpr))
+    print("Best BKG rejection: {:.3f}".format(best_bkgrej))
+
+    ax.plot(
+        best_tpr * 100,
+        best_bkgrej * 100,
+        marker="o",
+        color=color,
+        markersize=6,
+        label="Best WP (threshold: {:.3f}, signal eff.: {:.1f}%, bkg rej.: {:.1f}%)".format(
+            best_threshold,
+            best_tpr * 100,
+            best_bkgrej * 100),
+    )
+
+    ax.legend(loc="best", fontsize="x-small")
+
     return auc
 
 

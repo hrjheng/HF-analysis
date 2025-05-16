@@ -19,6 +19,7 @@ SignalTree = "DecayTree"
 BkgTree = "DecayTree"
 # Branch to load to the dataframe (training features). Should be common for signal and background
 Branches = [
+    "K_S0_mass",
     "K_S0_DIRA",
     "K_S0_decayLength",
     "K_S0_decayLengthErr",
@@ -39,7 +40,7 @@ Branches = [
 SignalWeights = [""]
 BkgWeights = [""]
 SignalCuts = [""]
-BkgCuts = ["K_S0_mass<=0.45||K_S0_mass>=0.53"]
+BkgCuts = ["K_S0_mass<=0.45|K_S0_mass>=0.53"]
 
 Category = "category"
 
