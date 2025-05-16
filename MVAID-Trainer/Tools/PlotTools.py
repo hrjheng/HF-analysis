@@ -6,13 +6,14 @@ from ROOT import (
     TCanvas,
     TLegend,
     TH1F,
+    TGraph,
     TColor,
     gROOT,
     gStyle,
     gPad,
     gSystem,
     kTRUE,
-    kFALSE,
+    kFALSE
 )
 import array
 import pandas as pd
@@ -72,6 +73,91 @@ def plot_mva(
     ax.legend(loc="best")
 
 
+def plot_mva_root(df, column, Wt="Wt", Classes=[""], logy=False, MVA="XGB", OutputDirName="Output"):
+    hist_list = {}
+    for i, Class in enumerate(Classes): # Background, Signal
+        for j, type in enumerate(["Train", "Test"]):
+            df_temp = df[df["Dataset"] == type]
+            df_temp = df_temp[df_temp["Class"] == Class]
+
+            histname = f"{column}_{type}_{Class}"
+            hist = TH1F(histname,histname,100,0,1)
+
+            for val, w in zip(df_temp[column], df_temp[Wt]):
+                hist.Fill(val, w)
+
+            hist.Scale(1.0 / hist.Integral(-1, -1))
+            hist.SetLineWidth(2)
+            if type == "Train":
+                if Class == "Background":
+                    hist.SetLineColor(TColor.GetColor("#3D90D7"))
+                    hist.SetFillColorAlpha(TColor.GetColor("#3D90D7"),0.5)
+                else:
+                    hist.SetLineColor(TColor.GetColor("#ee6677"))
+                    hist.SetFillColorAlpha(TColor.GetColor("#ee6677"),0.5)
+            else: # Test
+                hist.SetMarkerStyle(20)
+                hist.SetMarkerSize(0.7)
+                if Class == "Background":
+                    hist.SetLineColor(TColor.GetColor("#1a508b"))
+                    hist.SetMarkerColor(TColor.GetColor("#1a508b"))
+                else:
+                    hist.SetLineColor(TColor.GetColor("#8A2D3B"))
+                    hist.SetMarkerColor(TColor.GetColor("#8A2D3B"))
+
+            hist_list[f"{type} ({Class})"] = hist
+
+
+    min_y = min([hist.GetMinimum(0) for (key, hist) in hist_list.items()])
+    max_y = max([hist.GetMaximum() for (key, hist) in hist_list.items()])
+
+    canvas = TCanvas(f"canvas_{column}", f"canvas_{column}", 800, 700)
+    if logy:
+        canvas.SetLogy()
+
+    for i, (key, hist) in enumerate(hist_list.items()):
+        hist.GetXaxis().SetTitle("BDT prediction")
+        hist.GetXaxis().SetTitleOffset(1.3)
+        hist.GetYaxis().SetTitle("Normalized Entries")
+        hist.GetYaxis().SetTitleOffset(1.5)
+        hist.GetYaxis().SetRangeUser(
+            0 if logy is False else min_y * 0.7,
+            max_y * 1.2 if logy is False else max_y * 10,
+        )
+        
+        if "Train" in key:
+            if i == 0:
+                hist.Draw("HIST")
+            else:
+                hist.Draw("HIST SAME")
+        else:
+            if i == 0:
+                hist.Draw("PE1")
+            else:
+                hist.Draw("PE1 SAME")
+
+    canvas.RedrawAxis()
+
+    legend = TLegend(
+        gPad.GetLeftMargin() + 0.05,
+        (1 - gPad.GetTopMargin()) - 0.2,
+        (1 - gPad.GetRightMargin()) - 0.07,
+        (1 - gPad.GetTopMargin()) - 0.05,
+    )
+    legend.SetNColumns(2)
+    legend.SetTextSize(0.04)
+    legend.SetBorderSize(0)
+    legend.SetFillStyle(0)
+    for i, (key, hist) in enumerate(hist_list.items()):
+        legend.AddEntry(hist, key, "f" if "Train" in key else "epx")
+    legend.Draw()
+
+    canvas.SaveAs(f"{OutputDirName}/{MVA}/{MVA}_prediction.pdf")
+    canvas.SaveAs(f"{OutputDirName}/{MVA}/{MVA}_prediction.png")
+    canvas.Close()
+    del canvas
+
+
 def plot_roc_curve(
     df,
     score_column,
@@ -108,7 +194,6 @@ def plot_roc_curve(
     )
     ax.legend(loc="best")
 
-    # Find the best working point, i.e the point closest to (1,1) of tpr v.s (1-fpr)
     mindist = 1e10
     best_tpr = 0
     best_bkgrej = 0
@@ -120,7 +205,6 @@ def plot_roc_curve(
             best_tpr = tpr[i]
             best_bkgrej = bkgrej[i]
 
-    # get the corresponding prediction threshold
     best_threshold = thresholds[np.argmin(np.abs(tpr - best_tpr))]
     print("Best threshold: {:.3f}".format(best_threshold))
     print("Best TPR: {:.3f}".format(best_tpr))
@@ -141,6 +225,104 @@ def plot_roc_curve(
     ax.legend(loc="best", fontsize="x-small")
 
     return auc
+
+
+def plot_roc_curve_root(
+    df, score_column, cat, tpr_threshold=0, Wt="weight", MVA="XGB", OutputDirName="Output"
+):
+    from sklearn import metrics
+
+    list_graph = {}
+
+    for i, t in enumerate(["Train", "Test"]): # Train, Test
+        df_temp = df[df["Dataset"] == t]
+
+        fpr, tpr, thresholds = metrics.roc_curve(
+            df_temp[cat], df_temp[score_column], sample_weight=df_temp[Wt]
+        )
+        mask = tpr > tpr_threshold
+        fpr, tpr = fpr[mask], tpr[mask]
+        auc = metrics.auc(fpr, tpr)  
+
+        # Find the best working point, i.e the point closest to (1,1) of tpr v.s (1-fpr)
+        mindist = 1e10
+        best_tpr = 0
+        best_bkgrej = 0
+        tpr = list(map(lambda x: x * 100, tpr))
+        bkgrej = list(map(lambda x: (1 - x) * 100, fpr))
+        for i in range(len(bkgrej)):
+            dist = np.sqrt((100 - tpr[i]) ** 2 + (100 - bkgrej[i]) ** 2)
+            if dist < mindist:
+                mindist = dist
+                best_tpr = tpr[i]
+                best_bkgrej = bkgrej[i]
+
+        best_threshold = thresholds[np.argmin(np.abs(tpr - best_tpr))]
+        print("Best threshold: {:.3f}".format(best_threshold))
+        print("Best TPR: {:.3f}".format(best_tpr))
+        print("Best BKG rejection: {:.3f}".format(best_bkgrej))
+
+        graph_roc = TGraph(
+            len(fpr),
+            array.array("d", tpr),
+            array.array("d", bkgrej)
+        )
+        graph_roc.SetLineColor(TColor.GetColor("#4A4947" if t == "Train" else "#FFB22C"))
+        graph_roc.SetLineWidth(2)
+        linesty = 1 if ("Train" in t) else 2
+        print ("linesty=", linesty)
+        graph_roc.SetLineStyle(linesty)
+        list_graph[f"{t} (Full ROC curve)"] = graph_roc
+
+        graph_best = TGraph(1)
+        graph_best.SetPoint(0, best_tpr, best_bkgrej)
+        graph_best.SetMarkerStyle(20 if "Train" in t else 21)
+        graph_best.SetMarkerSize(1)
+        graph_best.SetMarkerColor(TColor.GetColor("#000000" if t == "Train" else "#854836"))
+        list_graph["{} (Best WP: threshold={:.3f}, signal eff.={:.1f}%, bkg rej.={:.1f}%)".format(
+            t, best_threshold, best_tpr, best_bkgrej)
+        ] = graph_best
+
+    canvas = TCanvas(f"canvas_{score_column}", f"canvas_{score_column}", 800, 700)
+    canvas.cd()
+    for i, (key, graph) in enumerate(list_graph.items()):
+        print (i, key)
+        graph.GetXaxis().SetTitle("Signal Efficiency = TPR (%)")
+        graph.GetXaxis().SetTitleOffset(1.3)
+        graph.GetYaxis().SetTitle("Background Rejection = 1 - FPR (%)")
+        graph.GetYaxis().SetTitleOffset(1.5)
+        graph.GetXaxis().SetLimits(-1, 101)
+        graph.GetHistogram().SetMinimum(-1)
+        graph.GetHistogram().SetMaximum(101)
+        if i == 0:
+            graph.Draw("AL" if "Full ROC curve" in key else "AP")
+        else:
+            graph.Draw("L SAME" if "Full ROC curve" in key else "P SAME")
+        
+    legend = TLegend(
+        gPad.GetLeftMargin() + 0.05,
+        gPad.GetBottomMargin() + 0.05,
+        gPad.GetLeftMargin() + 0.3,
+        gPad.GetBottomMargin() + 0.35
+    )
+    legend.SetTextSize(0.03)
+    legend.SetBorderSize(0)
+    legend.SetFillStyle(0)
+    for i, (key, graph) in enumerate(list_graph.items()):
+        legtext = ""
+        if "Best WP" in key:
+            # get the string inside the parentheses
+            tmptext = key.split(" (")[1].split(")")[0]
+            tmptext = tmptext.replace("Best WP: ", "")
+            legtext = r"#splitline{Best WP}{%s}" % tmptext
+
+        legend.AddEntry(graph, legtext if "Best WP" in key else key, "l" if "Full ROC curve" in key else "p")
+
+    legend.Draw()
+    canvas.SaveAs(f"{OutputDirName}/{MVA}/{MVA}_roc_curve.pdf")
+    canvas.SaveAs(f"{OutputDirName}/{MVA}/{MVA}_roc_curve.png")
+    canvas.Close()
+    del canvas
 
 
 def plot_single_roc_point(
@@ -229,7 +411,7 @@ def MakeFeaturePlotsROOT(
 
             hist_list.append(hist)
 
-        # get the maximum y value of all histograms
+
         min_y = min([hist.GetMinimum(0) for hist in hist_list])
         max_y = max([hist.GetMaximum() for hist in hist_list])
 
