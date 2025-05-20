@@ -6,6 +6,7 @@ from ROOT import (
     TCanvas,
     TLegend,
     TH1F,
+    TH1D,
     TGraph,
     TColor,
     gROOT,
@@ -26,51 +27,6 @@ def prGreen(prt):
 
 def MyBins(lower, upper, step):
     return np.arange(lower, upper, step).tolist()
-
-
-def plot_mva(
-    df,
-    column,
-    bins,
-    logscale=False,
-    ax=None,
-    title=None,
-    ls="dashed",
-    alpha=0.5,
-    sample="",
-    cat="Matchlabel",
-    Wt="Wt",
-    Classes=[""],
-    Colors=[""],
-):
-    histtype = "bar"
-    if sample == "test":
-        histtype = "step"
-    if ax is None:
-        ax = plt.gca()
-    for Class, Color in zip(Classes, Colors):
-        df.loc[(df["Class"] == str(Class))][column].hist(
-            bins=bins,
-            histtype=histtype,
-            alpha=alpha,
-            label=Class + " " + sample,
-            ax=ax,
-            density=False,
-            ls=ls,
-            weights=list(
-                np.ones_like(df.loc[(df["Class"] == str(Class))].index)
-                / len(df.loc[(df["Class"] == str(Class))].index)
-            ),
-            linewidth=2,
-            color=Color,
-        )
-
-    # ax.set_ylabel("density")
-    ax.set_xlabel(column)
-    ax.set_title(title)
-    if logscale:
-        ax.set_yscale("log")
-    ax.legend(loc="best")
 
 
 def plot_mva_root(df, column, Wt="Wt", Classes=[""], logy=False, MVA="XGB", OutputDirName="Output"):
@@ -158,74 +114,6 @@ def plot_mva_root(df, column, Wt="Wt", Classes=[""], logy=False, MVA="XGB", Outp
     del canvas
 
 
-def plot_roc_curve(
-    df,
-    score_column,
-    tpr_threshold=0,
-    ax=None,
-    color=None,
-    linestyle="-",
-    label=None,
-    cat="Matchlabel",
-    Wt="Wt",
-    LeftLabel="sPHENIX Internal",
-):
-    from sklearn import metrics
-
-    if ax is None:
-        ax = plt.gca()
-    if label is None:
-        label = score_column
-    fpr, tpr, thresholds = metrics.roc_curve(
-        df[cat], df[score_column], sample_weight=df[Wt]
-    )
-    mask = tpr > tpr_threshold
-    fpr, tpr = fpr[mask], tpr[mask]
-    auc = metrics.auc(fpr, tpr)
-    label = label + " auc=" + str(round(auc * 100, 1)) + "%"
-    ax.plot(
-        tpr * 100,
-        (1 - fpr) * 100,
-        label=label,
-        color=color,
-        linestyle=linestyle,
-        linewidth=1,
-        alpha=0.7,
-    )
-    ax.legend(loc="best")
-
-    mindist = 1e10
-    best_tpr = 0
-    best_bkgrej = 0
-    bkgrej = list(map(lambda x: 1 - x, fpr))
-    for i in range(len(bkgrej)):
-        dist = np.sqrt((1 - tpr[i]) ** 2 + (1 - bkgrej[i]) ** 2)
-        if dist < mindist:
-            mindist = dist
-            best_tpr = tpr[i]
-            best_bkgrej = bkgrej[i]
-
-    best_threshold = thresholds[np.argmin(np.abs(tpr - best_tpr))]
-    print("Best threshold: {:.3f}".format(best_threshold))
-    print("Best TPR: {:.3f}".format(best_tpr))
-    print("Best BKG rejection: {:.3f}".format(best_bkgrej))
-
-    ax.plot(
-        best_tpr * 100,
-        best_bkgrej * 100,
-        marker="o",
-        color=color,
-        markersize=6,
-        label="Best WP (threshold: {:.3f}, signal eff.: {:.1f}%, bkg rej.: {:.1f}%)".format(
-            best_threshold,
-            best_tpr * 100,
-            best_bkgrej * 100),
-    )
-
-    ax.legend(loc="best", fontsize="x-small")
-
-    return auc
-
 
 def plot_roc_curve_root(
     df, score_column, cat, tpr_threshold=0, Wt="weight", MVA="XGB", OutputDirName="Output"
@@ -270,7 +158,6 @@ def plot_roc_curve_root(
         graph_roc.SetLineColor(TColor.GetColor("#4A4947" if t == "Train" else "#FFB22C"))
         graph_roc.SetLineWidth(2)
         linesty = 1 if ("Train" in t) else 2
-        print ("linesty=", linesty)
         graph_roc.SetLineStyle(linesty)
         list_graph[f"{t} (Full ROC curve)"] = graph_roc
 
@@ -286,7 +173,6 @@ def plot_roc_curve_root(
     canvas = TCanvas(f"canvas_{score_column}", f"canvas_{score_column}", 800, 700)
     canvas.cd()
     for i, (key, graph) in enumerate(list_graph.items()):
-        print (i, key)
         graph.GetXaxis().SetTitle("Signal Efficiency = TPR (%)")
         graph.GetXaxis().SetTitleOffset(1.3)
         graph.GetYaxis().SetTitle("Background Rejection = 1 - FPR (%)")
@@ -353,18 +239,6 @@ def plot_single_roc_point(
     )
     ax.legend(loc="best")
 
-
-def pngtopdf(ListPattern=[], Save="mydoc.pdf"):
-    import glob, PIL.Image
-
-    L = []
-    for List in ListPattern:
-        L += [PIL.Image.open(f) for f in glob.glob(List)]
-    for i, Li in enumerate(L):
-        rgb = PIL.Image.new("RGB", Li.size, (255, 255, 255))
-        rgb.paste(Li, mask=Li.split()[3])
-        L[i] = rgb
-    L[0].save(Save, "PDF", resolution=100.0, save_all=True, append_images=L[1:])
 
 
 def MakeFeaturePlotsROOT(
@@ -482,62 +356,38 @@ def MakeCorrelationMatrix(X, features, MVA, method="pearson", OutputDirName="Out
     plt.close(fig)
 
 
-def plot_feature_importance(model, feature_names, outpath, title="Feature Importance"):
+def plot_feature_importance_pyr(model, feature_names, outpath, title="Feature Importance"):
     importances = model.feature_importances_
-    indices = np.argsort(importances)[::-1]  # descending order
-
-    sorted_features = [feature_names[i] for i in indices]
+    # indices     = np.argsort(importances)[::-1]  # descending
+    indices = np.argsort(importances)  # ascending
+    sorted_feats       = [feature_names[i] for i in indices]
     sorted_importances = importances[indices]
+    n_bins = len(sorted_feats)
 
-    plt.figure(figsize=(7, 0.4 * len(feature_names) + 1))
-    bars = plt.barh(range(len(sorted_features)), sorted_importances[::-1], align="center", color='steelblue')
-    plt.yticks(range(len(sorted_features)), sorted_features[::-1])
-    plt.xlabel("Importance")
-    plt.title(title)
+    h = TH1D("h_featImp", title, n_bins, 0, n_bins)
+    for i, imp in enumerate(sorted_importances):
+        h.SetBinContent(i+1, imp)
+        h.GetXaxis().SetBinLabel(i+1, sorted_feats[i])
 
-    # Save
-    plt.savefig(outpath + ".pdf")
-    plt.savefig(outpath + ".png")
-    plt.close()
+    barwidth = 0.7
+    h.SetFillColor(TColor.GetColor("#89A7C2"))
+    h.GetXaxis().SetTitleOffset(1.2)
+    h.GetYaxis().SetTitle("Feature importance")
+    h.SetBarWidth(barwidth)
+    h.SetBarOffset((1-barwidth)/2.)
 
+    canvas_height = max(300, 50 * n_bins + 100)
+    c = TCanvas("c_featImp", "Feature Importance", 800, canvas_height)
+    c.SetLeftMargin(0.30)
 
-def MakeFeaturePlots(
-    df_final,
-    features,
-    feature_bins,
-    Set="Train",
-    MVA="XGB_1",
-    OutputDirName="Output",
-    cat="Category",
-    label=[""],
-    weight="weight",
-    log=False,
-):
-    fig, axes = plt.subplots(1, len(features), figsize=(len(features) * 5, 5))
-    prGreen("Making " + Set + " dataset feature plots")
-    for m in range(len(features)):
-        # print(f'Feature {m} is {features[m]}')
-        for i, group_df in df_final[df_final["Dataset"] == Set].groupby(cat):
-            group_df[features[m]].hist(
-                histtype="step",
-                bins=30,
-                alpha=1,
-                label=label[i],
-                ax=axes[m],
-                density=False,
-                ls="-",
-                weights=group_df[weight] / group_df[weight].sum(),
-                linewidth=1,
-            )
-            # df_new = pd.concat([group_df, df_new],ignore_index=True, sort=False)
-        axes[m].legend(loc="upper right")
-        axes[m].set_xlabel(features[m])
-        if log:
-            axes[m].set_yscale("log")
-        axes[m].set_title(features[m] + " (" + Set + " Dataset)")
-    plt.savefig(
-        OutputDirName + "/" + MVA + "/" + MVA + "_" + "featureplots_" + Set + ".pdf"
-    )
+    h.Draw("HBAR")
+    c.RedrawAxis()
+        
+    c.SaveAs(outpath + ".pdf")
+    c.SaveAs(outpath + ".png")
+    c.Close()
+    del c
+
 
 
 def MakeSpectatorPlots(
